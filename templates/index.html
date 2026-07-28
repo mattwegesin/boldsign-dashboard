@@ -81,7 +81,23 @@
 
         <p>Click the button below to fetch the latest documents from BoldSign and generate your Excel reports.</p>
         
-        <a href="{{ url_for('generate_reports') }}" class="btn">Generate Reports</a>
+        <a href="{{ url_for('generate_reports') }}" class="btn" id="generate-btn" onclick="showLoading()">Generate Reports</a>
     </div>
+
+    <script>
+        function showLoading() {
+            const btn = document.getElementById('generate-btn');
+            btn.innerText = 'Generating Reports (This may take a minute)...';
+            btn.style.backgroundColor = '#95a5a6'; // Gray out the button
+            btn.style.pointerEvents = 'none'; // Prevent double clicking
+            
+            // Re-enable the button after 10 seconds just in case it finishes quickly
+            setTimeout(() => {
+                btn.innerText = 'Generate Reports';
+                btn.style.backgroundColor = '#3498db';
+                btn.style.pointerEvents = 'auto';
+            }, 10000);
+        }
+    </script>
 </body>
 </html>
