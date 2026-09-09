@@ -65,47 +65,61 @@ def generate_reports():
 
     docs = fetch_documents()
     filtered_docs = []
+    completed_docs = []
     
     for doc in docs:
-        if doc.get('displayStatus') == 'Waiting for me':
-            title = doc.get('messageTitle', 'Unknown')
-            timestamp = doc.get('createdDate')
-            time_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S') if timestamp else 'Unknown'
-            
+        title = doc.get('messageTitle', 'Unknown')
+        timestamp = doc.get('createdDate')
+        time_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S') if timestamp else 'Unknown'
+        
+        display_status = doc.get('displayStatus')
+        if display_status == 'Waiting for me':
             filtered_docs.append({
                 'Title': title,
                 'Time': time_str
             })
+        elif display_status == 'Completed':
+            completed_docs.append({
+                'Title': title,
+                'Time': time_str
+            })
             
-    if not filtered_docs:
-        flash('No documents found with status "Waiting for me".', 'warning')
+    if not filtered_docs and not completed_docs:
+        flash('No documents found with status "Waiting for me" or "Completed".', 'warning')
         return redirect(url_for('index'))
-
-    df = pd.DataFrame(filtered_docs)
-    
-    # Process duplicates
-    df['INN Code'] = df['Title'].apply(extract_inn_code)
-    duplicates_mask = df.duplicated(subset=['INN Code'], keep=False)
-    duplicates_df = df[duplicates_mask].copy()
-    if not duplicates_df.empty:
-        duplicates_df = duplicates_df.sort_values(by=['INN Code', 'Time'])
 
     # Create Zip File in memory
     memory_file = io.BytesIO()
     with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
         
-        # Write Main Document
-        main_excel = io.BytesIO()
-        with pd.ExcelWriter(main_excel, engine='openpyxl') as writer:
-            df.drop(columns=['INN Code']).to_excel(writer, index=False)
-        zf.writestr('Waiting_for_Me_Documents.xlsx', main_excel.getvalue())
-        
-        # Write Duplicates Document if they exist
-        if not duplicates_df.empty:
-            dup_excel = io.BytesIO()
-            with pd.ExcelWriter(dup_excel, engine='openpyxl') as writer:
-                duplicates_df.to_excel(writer, index=False)
-            zf.writestr('Duplicates_Waiting_for_Me.xlsx', dup_excel.getvalue())
+        # Write Waiting for me Documents if they exist
+        if filtered_docs:
+            df = pd.DataFrame(filtered_docs)
+            df['INN Code'] = df['Title'].apply(extract_inn_code)
+            duplicates_mask = df.duplicated(subset=['INN Code'], keep=False)
+            duplicates_df = df[duplicates_mask].copy()
+            if not duplicates_df.empty:
+                duplicates_df = duplicates_df.sort_values(by=['INN Code', 'Time'])
+
+            main_excel = io.BytesIO()
+            with pd.ExcelWriter(main_excel, engine='openpyxl') as writer:
+                df.drop(columns=['INN Code']).to_excel(writer, index=False)
+            zf.writestr('Waiting_for_Me_Documents.xlsx', main_excel.getvalue())
+            
+            # Write Duplicates Document if they exist
+            if not duplicates_df.empty:
+                dup_excel = io.BytesIO()
+                with pd.ExcelWriter(dup_excel, engine='openpyxl') as writer:
+                    duplicates_df.to_excel(writer, index=False)
+                zf.writestr('Duplicates_Waiting_for_Me.xlsx', dup_excel.getvalue())
+
+        # Write Completed Documents if they exist
+        if completed_docs:
+            completed_df = pd.DataFrame(completed_docs)
+            completed_excel = io.BytesIO()
+            with pd.ExcelWriter(completed_excel, engine='openpyxl') as writer:
+                completed_df.to_excel(writer, index=False)
+            zf.writestr('Completed_Documents.xlsx', completed_excel.getvalue())
 
     memory_file.seek(0)
     
